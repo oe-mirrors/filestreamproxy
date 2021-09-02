@@ -56,6 +56,7 @@ protected:
 	{
 		mShmFd = shm_open(mShmName.c_str(), O_CREAT | O_RDWR, S_IRWXU | S_IRWXG);
 		if (mShmFd < 0) {
+			ERROR("shm_open error: %d",mShmFd);
 			return false;
 		}
 		ftruncate(mShmFd, mShmSize);

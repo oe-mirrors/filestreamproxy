@@ -17,6 +17,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mount.h>
 
 #include "Util.h"
 #include "Logger.h"
@@ -51,6 +52,27 @@ static pthread_t source_thread_handle, stream_thread_handle;
 
 pid_t tsp_pid = 0, checker_pid = 0;
 unsigned long last_updated_time = 0;
+
+int mkdir_mount_devshm(void)
+{
+    const char mountpoint[] = "/dev/shm";
+    struct stat s;
+
+    if (stat(mountpoint, &s) == -1) {
+        if (errno == ENOENT) {
+            if (mkdir(mountpoint, 0755))
+                return -1;
+
+            if (mount("tmpfs", mountpoint, "tmpfs", 0, NULL))
+                return -1;
+        } else {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 //----------------------------------------------------------------------
 
 void release_webif_record()
@@ -232,6 +254,8 @@ int main(int argc, char **argv)
 
 	char update_status_command[255] = {0};
 
+	// check shm mount
+	int mountcheckresult = mkdir_mount_devshm();
 
 	HttpHeader header;
 	std::string req = HttpHeader::read_request();
@@ -239,6 +263,11 @@ int main(int argc, char **argv)
 	DEBUG("request head :\n%s", req.c_str());
 
 	try {
+
+		if(mountcheckresult != 0) {
+			throw(http_trap("shm mountcheck faild", 400, "Bad Request"));
+		}
+
 		if (req.find("\r\n\r\n") == std::string::npos) {
 			throw(http_trap("no found request done code.", 400, "Bad Request"));
 		}
@@ -394,6 +423,13 @@ int main(int argc, char **argv)
 		else {
 			error = HttpUtil::http_error(e.http_error, e.http_header);
 		}
+		streaming_write(error.c_str(), error.length(), true);
+		send_signal(checker_pid, SIGUSR1);
+		exit(-1);
+	}
+	catch (const std::exception &e) {
+		ERROR("Main exception: %s", e.what());
+		std::string error = HttpUtil::http_error(400, "Bad request");
 		streaming_write(error.c_str(), error.length(), true);
 		send_signal(checker_pid, SIGUSR1);
 		exit(-1);
