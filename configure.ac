@@ -18,10 +18,6 @@ AC_PROG_CXX
 
 AC_CONFIG_MACRO_DIR([m4])
 
-AC_LANG_PUSH([C++])
-AC_CHECK_HEADERS([boost/crc.hpp], [], [AC_MSG_ERROR(No found boost libraries.)])
-AC_LANG_POP([C++])
-
 AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(rt, shm_open)
 
